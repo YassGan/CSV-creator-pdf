@@ -17,6 +17,8 @@ function App() {
 <Router>
       <Routes>
         <Route path='/pdfImporter' element={<PdfImporter/>}/>  
+        <Route path='/' element={<PdfImporter/>}/>  
+
         </Routes>
 
 
