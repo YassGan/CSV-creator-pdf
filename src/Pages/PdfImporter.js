@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import * as XLSX from "xlsx";
 
 const PdfImporter = () => {
   const [pdfContent, setPdfContent] = useState("");
@@ -34,20 +35,16 @@ const PdfImporter = () => {
           .filter(sentence => sentence !== ""); // Filter out empty sentences
       };
 
-      // Function to generate CSV content from COs
-      const generateCOsCsvContent = (sentences) => {
-        let COsCsvContent = "";
-        sentences.forEach((sentence, index) => {
-          const coNumber = index + 1; // CO1, CO2, CO3, ...
-          COsCsvContent += `CO${coNumber};"${sentence}"\n`;
-        });
-        return COsCsvContent;
+      // Function to generate Excel data from COs
+      const generateCOsExcelData = (sentences) => {
+        const data = sentences.map((sentence, index) => ({
+          CO: `CO${index + 1}`,
+          Statement: sentence
+        }));
+        return data;
       };
 
-
-
-
-      // function to extract the last two numbers of the current year of study
+      // Function to extract the last two numbers of the current year of study
       const yearTwoDigits = (yearString) => {
         if (!yearString) {
           return "";
@@ -57,11 +54,6 @@ const PdfImporter = () => {
         return lastTwoDigits;
       };
 
-
-
-
-
-
       // Regex to extract Academic Year
       const regexAcademicYear = /Current Academic Year:\s*(\d{4}-\d{4})/; // Matches "Current Academic Year: 2024-2025"
       const matchAcademicYear = text.match(regexAcademicYear);
@@ -69,16 +61,13 @@ const PdfImporter = () => {
 
       console.log("Extracted Academic Year:", extractedAcademicYear);
       
-      
       // Regex to extract the course title
       const regexCourseTitle = /(?<=Course Title\s+)([\s\S]+?)(?=\s+Credits)/;
       const matchCourseTitle = text.match(regexCourseTitle);
 
-
-      // Regex to extract the course objectivs
+      // Regex to extract the course objectives
       const regexCourseObjective = /(?<=Course Objective\s+)([\s\S]+?)(?=\s+Course Outcomes)/;
       const matchCourseObjective = text.match(regexCourseObjective);
-
 
       // Regex to extract the semester
       const regexSemester = /Semester:\s*(\d+)/; // Matches "Semester: 1"
@@ -86,16 +75,6 @@ const PdfImporter = () => {
       const extractedSemester = matchSemester ? matchSemester[1] : "Not found";
 
       console.log("Extracted Semester:", extractedSemester.slice(-1));
-
-
-      // console.log("The last two digits of the current year ",yearTwoDigits(extractedAcademicYear))
-
-
-
-
-
-
-
 
       if (matchCourseTitle && matchCourseObjective) {
         const extractedCourseTitle = matchCourseTitle[1].trim(); // Trim extra spaces
@@ -111,29 +90,27 @@ const PdfImporter = () => {
         console.log("Extracted Course Title:", extractedCourseTitle);
         console.log("Extracted Course Objective:", extractedCourseObjective);
 
+        // Create Excel data
+        const excelData = [
+          { Title: extractedCourseTitle },
+          { AcademicYear: extractedAcademicYear },
+          { PassingTerm: yearTwoDigits(extractedAcademicYear) + "0" + extractedSemester.slice(-1) },
+          { YearOfCourse: "" },
+          { Semester: extractedSemester.slice(-1) },
+          { Faculty: "" },
+          { COStatements: "" },
+          ...generateCOsExcelData(sentences)
+        ];
 
+        // Convert JSON data to worksheet
+        const worksheet = XLSX.utils.json_to_sheet(excelData);
 
-        // Create CSV content with specific cells
-        const csvHeaderContent = `
-Title;"${extractedCourseTitle}"
-Academic Year      ;"${extractedAcademicYear}"
-Passing Term;"${yearTwoDigits(extractedAcademicYear)+ "0"+extractedSemester.slice(-1)}"
-Year of Course;""
-Semester;"${extractedSemester.slice(-1)}"
-Faculty;""
+        // Create a new workbook and append the worksheet
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "CourseData");
 
-"CO statements "
-${generateCOsCsvContent(sentences)}
-        `;
-
-        // Create a Blob containing the CSV file
-        const blob = new Blob([csvHeaderContent], { type: "text/csv;charset=utf-8" });
-
-        // Create download link and trigger download
-        const downloadLink = document.createElement("a");
-        downloadLink.href = URL.createObjectURL(blob);
-        downloadLink.download = "extracted_text.csv";
-        downloadLink.click();
+        // Generate XLSX file and download
+        XLSX.writeFile(workbook, "extracted_text.xlsx");
       } else {
         if (!matchCourseTitle) {
           console.log("Course Title not found in PDF content.");
